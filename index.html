@@ -30,20 +30,42 @@
 
   .panel .toolbar {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 44px;
+    left: 8px;
     display: flex;
-    justify-content: space-between;
+    gap: 6px;
     align-items: center;
     padding: 6px 10px;
     background: rgba(0,0,0,0.7);
-    opacity: 0;
-    transition: opacity 0.2s;
+    border-radius: 6px;
     z-index: 10;
+    display: none;
   }
 
-  .panel:hover .toolbar { opacity: 1; }
+  .panel .toolbar.open { display: flex; }
+
+  .menu-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 11;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .menu-btn:hover {
+    background: rgba(0,0,0,0.85);
+  }
 
   .toolbar select {
     background: #222;
@@ -74,6 +96,29 @@
     top: 0; left: 0; right: 0; bottom: 0;
     z-index: 100;
   }
+
+  .mute-btn {
+    position: absolute;
+    top: 8px;
+    left: 48px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0,0,0,0.6);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }
+
+  .mute-btn:hover {
+    background: rgba(0,0,0,0.85);
+  }
 </style>
 </head>
 <body>
@@ -87,18 +132,33 @@
 
 <script>
 const channels = [
-  { name: "Fox",    src: "https://www.youtube.com/embed/ZvdiJUYGBis?autoplay=1&mute=1&cc_load_policy=1" },
-  { name: "Arirang",     src: "https://www.youtube.com/embed/live_stream?channel=UC-PHIZjV-oX8H7zD1cCN2NQ&autoplay=1&mute=1&cc_load_policy=1" },
-  { name: "MBC News",    src: "https://www.youtube.com/embed/q9bM12ucTIY?autoplay=1&mute=1&cc_load_policy=1" },
-  { name: "Bloomberg",   src: "https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg&autoplay=1&mute=1&cc_load_policy=1" },
+  { name: "Fox",    videoId: "ZvdiJUYGBis" },
+  { name: "Arirang",     videoId: "live_stream", channelId: "UC-PHIZjV-oX8H7zD1cCN2NQ" },
+  { name: "MBC News",    videoId: "q9bM12ucTIY" },
+  { name: "Bloomberg",   videoId: "live_stream", channelId: "UCIALMKvObZNtJ6AmdCLP7Lg" },
 ];
 
-const defaults = [0, 1, 2, 3]; // initial channel indices
-const panels = [0, 1, 2, 3];
+const defaults = [0, 1, 2, 3];
+const panelIndices = [0, 1, 2, 3];
+const players = {};   // panelIdx -> YT.Player
+const muted = {};     // panelIdx -> boolean
+
+function buildMenuBtn(panelIdx) {
+  const btn = document.createElement("button");
+  btn.className = "menu-btn";
+  btn.textContent = "\u2630";
+  btn.title = "Menu";
+  btn.addEventListener("click", () => {
+    const toolbar = document.getElementById("toolbar-" + panelIdx);
+    toolbar.classList.toggle("open");
+  });
+  return btn;
+}
 
 function buildToolbar(panelIdx) {
   const toolbar = document.createElement("div");
   toolbar.className = "toolbar";
+  toolbar.id = "toolbar-" + panelIdx;
 
   const select = document.createElement("select");
   channels.forEach((ch, i) => {
@@ -119,16 +179,73 @@ function buildToolbar(panelIdx) {
   return toolbar;
 }
 
+function buildMuteBtn(panelIdx) {
+  const btn = document.createElement("button");
+  btn.className = "mute-btn";
+  btn.id = "mute-btn-" + panelIdx;
+  btn.textContent = "\u{1F507}";
+  btn.title = "Unmute";
+  muted[panelIdx] = true;
+
+  btn.addEventListener("click", () => {
+    const player = players[panelIdx];
+    if (!player || typeof player.isMuted !== "function") return;
+    if (player.isMuted()) {
+      player.unMute();
+      muted[panelIdx] = false;
+      btn.textContent = "\u{1F50A}";
+      btn.title = "Mute";
+    } else {
+      player.mute();
+      muted[panelIdx] = true;
+      btn.textContent = "\u{1F507}";
+      btn.title = "Unmute";
+    }
+  });
+  return btn;
+}
+
+function getPlayerVars(ch) {
+  const vars = { autoplay: 1, mute: 1, cc_load_policy: 1 };
+  if (ch.channelId) vars.channel = ch.channelId;
+  return vars;
+}
+
 function loadChannel(panelIdx, channelIdx) {
-  const panel = document.getElementById("panel-" + panelIdx);
-  let iframe = panel.querySelector("iframe");
-  if (!iframe) {
-    iframe = document.createElement("iframe");
-    iframe.allow = "autoplay; encrypted-media";
-    iframe.allowFullscreen = true;
-    panel.appendChild(iframe);
+  const ch = channels[channelIdx];
+  const containerId = "player-" + panelIdx;
+
+  // Destroy existing player
+  if (players[panelIdx]) {
+    players[panelIdx].destroy();
+    delete players[panelIdx];
   }
-  iframe.src = channels[channelIdx].src;
+
+  // Ensure container div exists
+  const panel = document.getElementById("panel-" + panelIdx);
+  let container = document.getElementById(containerId);
+  if (!container) {
+    container = document.createElement("div");
+    container.id = containerId;
+    container.style.width = "100%";
+    container.style.height = "100%";
+    panel.appendChild(container);
+  }
+
+  players[panelIdx] = new YT.Player(containerId, {
+    width: "100%",
+    height: "100%",
+    videoId: ch.videoId,
+    playerVars: getPlayerVars(ch),
+    events: {
+      onReady: function(event) {
+        // Reset mute button state to match player
+        muted[panelIdx] = true;
+        const btn = document.getElementById("mute-btn-" + panelIdx);
+        if (btn) { btn.textContent = "\u{1F507}"; btn.title = "Unmute"; }
+      }
+    }
+  });
 }
 
 function toggleFullscreen(panelIdx) {
@@ -140,11 +257,16 @@ function toggleFullscreen(panelIdx) {
   }
 }
 
-panels.forEach(i => {
-  const panel = document.getElementById("panel-" + i);
-  panel.appendChild(buildToolbar(i));
-  loadChannel(i, defaults[i]);
-});
+// YouTube IFrame API calls this when ready
+function onYouTubeIframeAPIReady() {
+  panelIndices.forEach(i => {
+    const panel = document.getElementById("panel-" + i);
+    panel.appendChild(buildMenuBtn(i));
+    panel.appendChild(buildToolbar(i));
+    panel.appendChild(buildMuteBtn(i));
+    loadChannel(i, defaults[i]);
+  });
+}
 
 document.addEventListener("keydown", e => {
   if (e.key === "Escape" && document.fullscreenElement) {
@@ -152,5 +274,6 @@ document.addEventListener("keydown", e => {
   }
 });
 </script>
+<script src="https://www.youtube.com/iframe_api"></script>
 </body>
 </html>
