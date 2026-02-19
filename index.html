@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split News</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; font-family: system-ui, sans-serif; height: 100vh; overflow: hidden; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    height: 100vh;
+    gap: 2px;
+    background: #333;
+  }
+
+  .panel {
+    position: relative;
+    background: #000;
+  }
+
+  .panel iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .panel .toolbar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(0,0,0,0.7);
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 10;
+  }
+
+  .panel:hover .toolbar { opacity: 1; }
+
+  .toolbar select {
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .toolbar button {
+    background: #222;
+    color: #fff;
+    border: 1px solid #555;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .toolbar button:hover, .toolbar select:hover {
+    background: #444;
+  }
+
+  .panel.fullscreen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 100;
+  }
+</style>
+</head>
+<body>
+
+<div class="grid" id="grid">
+  <div class="panel" id="panel-0"></div>
+  <div class="panel" id="panel-1"></div>
+  <div class="panel" id="panel-2"></div>
+  <div class="panel" id="panel-3"></div>
+</div>
+
+<script>
+const channels = [
+  { name: "Fox",    src: "https://www.youtube.com/embed/ZvdiJUYGBis?autoplay=1&mute=1&cc_load_policy=1" },
+  { name: "Arirang",     src: "https://www.youtube.com/embed/live_stream?channel=UC-PHIZjV-oX8H7zD1cCN2NQ&autoplay=1&mute=1&cc_load_policy=1" },
+  { name: "MBC News",    src: "https://www.youtube.com/embed/q9bM12ucTIY?autoplay=1&mute=1&cc_load_policy=1" },
+  { name: "Bloomberg",   src: "https://www.youtube.com/embed/live_stream?channel=UCIALMKvObZNtJ6AmdCLP7Lg&autoplay=1&mute=1&cc_load_policy=1" },
+];
+
+const defaults = [0, 1, 2, 3]; // initial channel indices
+const panels = [0, 1, 2, 3];
+
+function buildToolbar(panelIdx) {
+  const toolbar = document.createElement("div");
+  toolbar.className = "toolbar";
+
+  const select = document.createElement("select");
+  channels.forEach((ch, i) => {
+    const opt = document.createElement("option");
+    opt.value = i;
+    opt.textContent = ch.name;
+    select.appendChild(opt);
+  });
+  select.value = defaults[panelIdx];
+  select.addEventListener("change", () => loadChannel(panelIdx, +select.value));
+
+  const fsBtn = document.createElement("button");
+  fsBtn.textContent = "Fullscreen";
+  fsBtn.addEventListener("click", () => toggleFullscreen(panelIdx));
+
+  toolbar.appendChild(select);
+  toolbar.appendChild(fsBtn);
+  return toolbar;
+}
+
+function loadChannel(panelIdx, channelIdx) {
+  const panel = document.getElementById("panel-" + panelIdx);
+  let iframe = panel.querySelector("iframe");
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.allow = "autoplay; encrypted-media";
+    iframe.allowFullscreen = true;
+    panel.appendChild(iframe);
+  }
+  iframe.src = channels[channelIdx].src;
+}
+
+function toggleFullscreen(panelIdx) {
+  const panel = document.getElementById("panel-" + panelIdx);
+  if (!document.fullscreenElement) {
+    panel.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+panels.forEach(i => {
+  const panel = document.getElementById("panel-" + i);
+  panel.appendChild(buildToolbar(i));
+  loadChannel(i, defaults[i]);
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && document.fullscreenElement) {
+    document.exitFullscreen();
+  }
+});
+</script>
+</body>
+</html>
