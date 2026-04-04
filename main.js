@@ -19,13 +19,18 @@ function getLocalIp() {
 
 let server;
 let serverPort;
-const CONFIG_FILE = path.join(__dirname, "config.json");
+const CONFIG_FILE = path.join(app.getPath("userData"), "config.json");
+const BUNDLED_CONFIG = path.join(__dirname, "config.json");
 
 function loadConfig() {
   let config = { channels: [], positions: [0, 1, 2, 3] };
   try {
     if (fs.existsSync(CONFIG_FILE)) {
       config = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
+    } else if (fs.existsSync(BUNDLED_CONFIG)) {
+      // Copy bundled config to userData on first run
+      config = JSON.parse(fs.readFileSync(BUNDLED_CONFIG, "utf8"));
+      fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
     }
   } catch (err) {
     console.error("Failed to load config:", err);
@@ -52,8 +57,10 @@ function startServer() {
   return new Promise((resolve) => {
     server = http.createServer((req, res) => {
       const { method, url } = req;
+      const parsedUrl = new URL(url, "http://localhost");
+      const pathname = parsedUrl.pathname;
 
-      if (url === "/config") {
+      if (pathname === "/config") {
         if (method === "GET") {
           res.writeHead(200, { "Content-Type": "application/json" });
           res.end(JSON.stringify(loadConfig()));
@@ -76,15 +83,24 @@ function startServer() {
         }
       }
 
-      let filePath = "index.html";
-      if (url === "/control") {
+      let filePath = pathname === "/" ? "index.html" : pathname.substring(1);
+      if (pathname === "/control") {
         filePath = "control.html";
       }
 
       const fullPath = path.join(__dirname, filePath);
       if (fs.existsSync(fullPath)) {
         const ext = path.extname(filePath);
-        const contentType = ext === ".html" ? "text/html" : "text/plain";
+        const contentTypes = {
+          ".html": "text/html",
+          ".js": "application/javascript",
+          ".css": "text/css",
+          ".json": "application/json",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".gif": "image/gif",
+        };
+        const contentType = contentTypes[ext] || "text/plain";
         res.writeHead(200, { "Content-Type": contentType });
         fs.createReadStream(fullPath).pipe(res);
       } else {

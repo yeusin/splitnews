@@ -18,7 +18,9 @@
     "productName": "Split News",
     "files": [
       "main.js",
-      "index.html"
+      "index.html",
+      "control.html",
+      "config.json"
     ],
     "mac": {
       "target": "dmg"
