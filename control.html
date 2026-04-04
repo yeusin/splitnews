@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Split News Control Panel</title>
+<style>
+  body { font-family: system-ui, sans-serif; padding: 20px; background: #f0f0f0; max-width: 800px; margin: 0 auto; }
+  h1 { color: #333; }
+  .section { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+  h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  
+  .grid-setup { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+  .grid-panel { border: 1px dashed #ccc; padding: 10px; border-radius: 4px; background: #fafafa; }
+  .grid-panel label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 0.9rem; }
+  select { width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ddd; }
+
+  .channel-list { margin-bottom: 15px; }
+  .channel-item { display: flex; gap: 10px; align-items: center; padding: 8px; border-bottom: 1px solid #eee; }
+  .channel-item:last-child { border-bottom: none; }
+  .channel-item input { padding: 6px; border: 1px solid #ddd; border-radius: 4px; flex: 1; }
+  .remove-btn { color: #cc0000; cursor: pointer; border: none; background: none; font-size: 1.2rem; }
+
+  button.save-btn { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+  button.save-btn:hover { background: #0056b3; }
+  button.add-btn { background: #28a745; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+  button.add-btn:hover { background: #218838; }
+
+  .hint { font-size: 0.8rem; color: #666; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Split News Control</h1>
+
+<div class="section">
+  <h2>Positions</h2>
+  <div class="grid-setup" id="positions">
+    <div class="grid-panel"><label>Top Left</label><select id="pos-0"></select></div>
+    <div class="grid-panel"><label>Top Right</label><select id="pos-1"></select></div>
+    <div class="grid-panel"><label>Bottom Left</label><select id="pos-2"></select></div>
+    <div class="grid-panel"><label>Bottom Right</label><select id="pos-3"></select></div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Manage Channels</h2>
+  <div id="channel-list" class="channel-list"></div>
+  <button class="add-btn" onclick="addChannel()">+ Add Channel</button>
+  <div class="hint">Use "live_stream" as Video ID for YouTube Live with Channel ID.</div>
+</div>
+
+<div style="text-align: right;">
+  <button class="save-btn" onclick="save()">Save Changes</button>
+</div>
+
+<script>
+let config = { channels: [], positions: [0, 1, 2, 3] };
+
+async function load() {
+  const res = await fetch("/config");
+  config = await res.json();
+  render();
+}
+
+function render() {
+  const list = document.getElementById("channel-list");
+  list.innerHTML = "";
+  
+  config.channels.forEach((ch, i) => {
+    const div = document.createElement("div");
+    div.className = "channel-item";
+    div.innerHTML = `
+      <input type="text" placeholder="Name" value="${ch.name}" onchange="updateCh(${i}, 'name', this.value)">
+      <input type="text" placeholder="Video ID" value="${ch.videoId}" onchange="updateCh(${i}, 'videoId', this.value)">
+      <input type="text" placeholder="Channel ID (Optional)" value="${ch.channelId || ''}" onchange="updateCh(${i}, 'channelId', this.value)">
+      <button class="remove-btn" onclick="removeChannel(${i})">&times;</button>
+    `;
+    list.appendChild(div);
+  });
+
+  // Update selects
+  for (let i = 0; i < 4; i++) {
+    const select = document.getElementById("pos-" + i);
+    select.innerHTML = "";
+    config.channels.forEach((ch, idx) => {
+      const opt = document.createElement("option");
+      opt.value = idx;
+      opt.textContent = ch.name;
+      if (config.positions[i] === idx) opt.selected = true;
+      select.appendChild(opt);
+    });
+    select.onchange = (e) => { config.positions[i] = parseInt(e.target.value); };
+  }
+}
+
+function updateCh(i, key, val) {
+  config.channels[i][key] = val;
+  render(); // Re-render to update selects
+}
+
+function addChannel() {
+  config.channels.push({ name: "New Channel", videoId: "" });
+  render();
+}
+
+function removeChannel(i) {
+  config.channels.splice(i, 1);
+  // Adjust positions if needed
+  config.positions = config.positions.map(p => {
+    if (p === i) return 0;
+    if (p > i) return p - 1;
+    return p;
+  });
+  render();
+}
+
+async function save() {
+  const res = await fetch("/config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(config)
+  });
+  if (res.ok) {
+    alert("Saved! Reload the main viewer to see changes.");
+  } else {
+    alert("Error saving config.");
+  }
+}
+
+load();
+</script>
+
+</body>
+</html>

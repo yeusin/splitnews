@@ -1,0 +1,32 @@
+{
+  "channels": [
+    {
+      "name": "Fox",
+      "videoId": "ZvdiJUYGBis"
+    },
+    {
+      "name": "Arirang",
+      "videoId": "live_stream",
+      "channelId": "UC-PHIZjV-oX8H7zD1cCN2NQ"
+    },
+    {
+      "name": "MBC News",
+      "videoId": "q9bM12ucTIY"
+    },
+    {
+      "name": "Bloomberg",
+      "videoId": "live_stream",
+      "channelId": "UCIALMKvObZNtJ6AmdCLP7Lg"
+    },
+    {
+      "name": "EarthCam",
+      "videoId": "rnXIjl_Rzy4"
+    }
+  ],
+  "positions": [
+    4,
+    1,
+    2,
+    3
+  ]
+}

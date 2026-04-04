@@ -33,16 +33,36 @@
     top: 44px;
     left: 8px;
     display: flex;
-    gap: 6px;
-    align-items: center;
-    padding: 6px 10px;
-    background: rgba(0,0,0,0.7);
-    border-radius: 6px;
-    z-index: 10;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 10px;
+    background: rgba(0,0,0,0.8);
+    border-radius: 8px;
+    z-index: 20;
     display: none;
+    min-width: 160px;
   }
 
   .panel .toolbar.open { display: flex; }
+
+  .toolbar-row {
+    display: flex;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .ip-badge {
+    align-self: center;
+    background: rgba(255,255,255,0.1);
+    color: #00ff00;
+    font-family: monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-bottom: 4px;
+    border: 1px solid rgba(0,255,0,0.3);
+  }
 
   .menu-btn {
     position: absolute;
@@ -135,17 +155,24 @@
 </div>
 
 <script>
-const channels = [
-  { name: "Fox",    videoId: "ZvdiJUYGBis" },
-  { name: "Arirang",     videoId: "live_stream", channelId: "UC-PHIZjV-oX8H7zD1cCN2NQ" },
-  { name: "MBC News",    videoId: "q9bM12ucTIY" },
-  { name: "Bloomberg",   videoId: "live_stream", channelId: "UCIALMKvObZNtJ6AmdCLP7Lg" },
-];
-
-const defaults = [0, 1, 2, 3];
+let channels = [];
+let defaults = [0, 1, 2, 3];
+let serverInfo = { ip: "", port: "" };
 const panelIndices = [0, 1, 2, 3];
 const players = {};   // panelIdx -> YT.Player
 const muted = {};     // panelIdx -> boolean
+
+async function fetchConfig() {
+  try {
+    const res = await fetch("/config");
+    const config = await res.json();
+    channels = config.channels;
+    defaults = config.positions;
+    serverInfo = config.server || serverInfo;
+  } catch (err) {
+    console.error("Failed to fetch config", err);
+  }
+}
 
 function buildMenuBtn(panelIdx) {
   const btn = document.createElement("button");
@@ -164,7 +191,17 @@ function buildToolbar(panelIdx) {
   toolbar.className = "toolbar";
   toolbar.id = "toolbar-" + panelIdx;
 
+  // Centered IP Badge at the top of the toolbar
+  const ipBadge = document.createElement("div");
+  ipBadge.className = "ip-badge";
+  ipBadge.textContent = `${serverInfo.ip}:${serverInfo.port}`;
+  toolbar.appendChild(ipBadge);
+
+  const row1 = document.createElement("div");
+  row1.className = "toolbar-row";
+
   const select = document.createElement("select");
+  select.style.flex = "1";
   channels.forEach((ch, i) => {
     const opt = document.createElement("option");
     opt.value = i;
@@ -173,13 +210,29 @@ function buildToolbar(panelIdx) {
   });
   select.value = defaults[panelIdx];
   select.addEventListener("change", () => loadChannel(panelIdx, +select.value));
+  row1.appendChild(select);
+
+  const row2 = document.createElement("div");
+  row2.className = "toolbar-row";
 
   const fsBtn = document.createElement("button");
   fsBtn.textContent = "Fullscreen";
+  fsBtn.style.flex = "1";
   fsBtn.addEventListener("click", () => toggleFullscreen(panelIdx));
 
-  toolbar.appendChild(select);
-  toolbar.appendChild(fsBtn);
+  const reloadBtn = document.createElement("button");
+  reloadBtn.textContent = "Reload All";
+  reloadBtn.style.flex = "1";
+  reloadBtn.addEventListener("click", async () => {
+    await fetchConfig();
+    initPanels();
+  });
+
+  row2.appendChild(fsBtn);
+  row2.appendChild(reloadBtn);
+
+  toolbar.appendChild(row1);
+  toolbar.appendChild(row2);
   return toolbar;
 }
 
@@ -262,9 +315,16 @@ function toggleFullscreen(panelIdx) {
 }
 
 // YouTube IFrame API calls this when ready
-function onYouTubeIframeAPIReady() {
+async function onYouTubeIframeAPIReady() {
+  await fetchConfig();
+  initPanels();
+}
+
+function initPanels() {
   panelIndices.forEach(i => {
     const panel = document.getElementById("panel-" + i);
+    panel.innerHTML = ""; 
+    
     panel.appendChild(buildMenuBtn(i));
     panel.appendChild(buildToolbar(i));
     panel.appendChild(buildMuteBtn(i));
