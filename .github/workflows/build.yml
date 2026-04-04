@@ -7,30 +7,51 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-mac:
-    runs-on: macos-latest
+  build:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            ext: dmg
+            name: mac
+          - os: windows-latest
+            ext: exe
+            name: windows
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm ci
-      - run: npx electron-builder --mac --publish never
+      - name: Build
+        run: npx electron-builder --${{ matrix.name == 'mac' && 'mac' || 'win' }} --publish never
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-build
-          path: dist/*.dmg
+          name: ${{ matrix.name }}-build
+          path: dist/*.${{ matrix.ext }}
+          retention-days: 1
 
-  build-windows:
-    runs-on: windows-latest
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-      - run: npm ci
-      - run: npx electron-builder --win --publish never
-      - uses: actions/upload-artifact@v4
+          path: artifacts
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: windows-build
-          path: dist/*.exe
+          files: artifacts/**/*
+          generate_release_notes: true
+      - name: Delete older releases
+        uses: dev-drprasad/delete-older-releases@v0.3.3
+        with:
+          keep_latest: 1
+          delete_tags: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
