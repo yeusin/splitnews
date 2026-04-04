@@ -1,6 +1,6 @@
 {
   "name": "splitnews",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "Split-screen live news viewer",
   "main": "main.js",
   "scripts": {

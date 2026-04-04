@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: npm version ${{ github.ref_name }} --no-git-tag-version --allow-same-version
       - name: Build
         run: npx electron-builder --${{ matrix.name == 'mac' && 'mac' || 'win' }} --publish never
       - uses: actions/upload-artifact@v4
