@@ -262,23 +262,19 @@ function buildMuteBtn(panelIdx) {
   return btn;
 }
 
-function getPlayerVars(ch) {
-  const vars = { autoplay: 1, mute: 1, cc_load_policy: 1 };
-  if (ch.channelId) vars.channel = ch.channelId;
-  return vars;
+function getUploadsPlaylistId(channelId) {
+  return "UU" + channelId.substring(2);
 }
 
 function loadChannel(panelIdx, channelIdx) {
   const ch = channels[channelIdx];
   const containerId = "player-" + panelIdx;
 
-  // Destroy existing player
   if (players[panelIdx]) {
     players[panelIdx].destroy();
     delete players[panelIdx];
   }
 
-  // Ensure container div exists
   const panel = document.getElementById("panel-" + panelIdx);
   let container = document.getElementById(containerId);
   if (!container) {
@@ -289,20 +285,30 @@ function loadChannel(panelIdx, channelIdx) {
     panel.appendChild(container);
   }
 
-  players[panelIdx] = new YT.Player(containerId, {
+  var playerConfig = {
     width: "100%",
     height: "100%",
-    videoId: ch.videoId,
-    playerVars: getPlayerVars(ch),
+    playerVars: { autoplay: 1, mute: 1, cc_load_policy: 1 },
     events: {
       onReady: function(event) {
-        // Reset mute button state to match player
         muted[panelIdx] = true;
         const btn = document.getElementById("mute-btn-" + panelIdx);
         if (btn) { btn.textContent = "\u{1F507}"; btn.title = "Unmute"; }
       }
     }
-  });
+  };
+
+  if (ch.channelId) {
+    playerConfig.playerVars.listType = "playlist";
+    playerConfig.playerVars.list = getUploadsPlaylistId(ch.channelId);
+    playerConfig.playerVars.loop = 1;
+  } else {
+    playerConfig.videoId = ch.videoId;
+    playerConfig.playerVars.loop = 1;
+    playerConfig.playerVars.playlist = ch.videoId;
+  }
+
+  players[panelIdx] = new YT.Player(containerId, playerConfig);
 }
 
 function toggleFullscreen(panelIdx) {

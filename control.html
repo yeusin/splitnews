@@ -47,7 +47,7 @@
   <h2>Manage Channels</h2>
   <div id="channel-list" class="channel-list"></div>
   <button class="add-btn" onclick="addChannel()">+ Add Channel</button>
-  <div class="hint">Use "live_stream" as Video ID for YouTube Live with Channel ID.</div>
+  <div class="hint">Video ID: loops a single video. Channel ID: plays the channel's latest uploaded videos in order.</div>
 </div>
 
 <div style="text-align: right;">
@@ -100,7 +100,7 @@ function updateCh(i, key, val) {
 }
 
 function addChannel() {
-  config.channels.push({ name: "New Channel", videoId: "" });
+    config.channels.push({ name: "New Channel", videoId: "", channelId: "" });
   render();
 }
 
