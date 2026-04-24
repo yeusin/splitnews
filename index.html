@@ -294,6 +294,12 @@ function loadChannel(panelIdx, channelIdx) {
         muted[panelIdx] = true;
         const btn = document.getElementById("mute-btn-" + panelIdx);
         if (btn) { btn.textContent = "\u{1F507}"; btn.title = "Unmute"; }
+      },
+      onError: function(event) {
+        const player = players[panelIdx];
+        if (player && typeof player.nextVideo === "function") {
+          player.nextVideo();
+        }
       }
     }
   };
