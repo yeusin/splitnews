@@ -291,14 +291,44 @@ function loadChannel(panelIdx, channelIdx) {
     playerVars: { autoplay: 1, mute: 1, cc_load_policy: 1 },
     events: {
       onReady: function(event) {
+        players[panelIdx]._retries = 0;
         muted[panelIdx] = true;
         const btn = document.getElementById("mute-btn-" + panelIdx);
         if (btn) { btn.textContent = "\u{1F507}"; btn.title = "Unmute"; }
       },
+      onStateChange: function(event) {
+        const panel = panelIdx;
+        clearTimeout(players[panel]._skipTimer);
+        if (event.data === YT.PlayerState.PLAYING) {
+          players[panel]._retries = 0;
+          return;
+        }
+        if (event.data === YT.PlayerState.UNSTARTED || event.data === YT.PlayerState.BUFFERING) {
+          players[panel]._skipTimer = setTimeout(() => {
+            const p = players[panel];
+            if (!p || typeof p.getPlayerState !== "function") return;
+            const state = p.getPlayerState();
+            if (state === YT.PlayerState.UNSTARTED || state === YT.PlayerState.BUFFERING) {
+              p._retries = (p._retries || 0) + 1;
+              if (p._retries <= 1) {
+                p.playVideoAt(p.getPlaylistIndex());
+              } else {
+                p._retries = 0;
+                p.nextVideo();
+              }
+            }
+          }, 10000);
+        }
+      },
       onError: function(event) {
         const player = players[panelIdx];
-        if (player && typeof player.nextVideo === "function") {
-          player.nextVideo();
+        if (!player || typeof player.nextVideo !== "function") return;
+        player._retries = (player._retries || 0) + 1;
+        if (player._retries <= 1) {
+          setTimeout(() => player.playVideoAt(player.getPlaylistIndex()), 1500);
+        } else {
+          player._retries = 0;
+          setTimeout(() => player.nextVideo(), 1500);
         }
       }
     }
@@ -308,6 +338,7 @@ function loadChannel(panelIdx, channelIdx) {
     playerConfig.playerVars.listType = "playlist";
     playerConfig.playerVars.list = getUploadsPlaylistId(ch.channelId);
     playerConfig.playerVars.loop = 1;
+    playerConfig.playerVars.index = 0;
   } else {
     playerConfig.videoId = ch.videoId;
     playerConfig.playerVars.loop = 1;
